@@ -1,0 +1,259 @@
+#include <iostream>
+#include <queue>
+#include <stack>
+#include <string>
+using namespace std;
+
+
+class Room {
+public:
+    int id;
+    string type;       
+    string status;    
+    Room* left;
+    Room* right;
+
+    Room(int id, string type) : id(id), type(type), status("Ready"), left(nullptr), right(nullptr) {}
+};
+
+class Floor {
+public:
+    int floorNumber;
+    Room* rootRoom;  
+    Floor* nextFloor; 
+
+    Floor(int floorNumber) : floorNumber(floorNumber), rootRoom(nullptr), nextFloor(nullptr) {}
+
+    void addRoom(int id, string type) {
+        Room* newRoom = new Room(id, type);
+        if (!rootRoom) {
+            rootRoom = newRoom;
+        } else {
+            insertRoom(rootRoom, newRoom);
+        }
+    }
+
+    void insertRoom(Room* current, Room* newRoom) {
+        if (newRoom->id < current->id) {
+            if (!current->left)
+                current->left = newRoom;
+            else
+                insertRoom(current->left, newRoom);
+        } else {
+            if (!current->right)
+                current->right = newRoom;
+            else
+                insertRoom(current->right, newRoom);
+        }
+    }
+
+    void displayRooms(Room* current) {
+        if (!current) return;
+        displayRooms(current->left);
+        cout << "Room ID: " << current->id << ", Type: " << current->type << ", Status: " << current->status << endl;
+        displayRooms(current->right);
+    }
+};
+
+class BookingRequest {
+public:
+    string customerName;
+    string roomType;
+    int nights;
+    bool highPriority;
+
+    BookingRequest(string name, string type, int nights, bool priority)
+        : customerName(name), roomType(type), nights(nights), highPriority(priority) {}
+};
+
+class BookingRecord {
+public:
+    string customerName;
+    int floorNumber;
+    int roomId;
+
+    BookingRecord(string name, int floor, int room)
+        : customerName(name), floorNumber(floor), roomId(room) {}
+};
+
+class HotelManagementSystem {
+private:
+    Floor* floorsHead;
+    queue<BookingRequest> highPriorityQueue;
+    queue<BookingRequest> regularQueue;
+    stack<BookingRecord> bookingHistory;
+    int totalFloors;
+    int roomsPerFloor;
+
+public:
+    HotelManagementSystem(int totalFloors, int roomsPerFloor)
+        : totalFloors(totalFloors), roomsPerFloor(roomsPerFloor), floorsHead(nullptr) {
+        initializeHotel();
+    }
+
+    void initializeHotel() {
+        for (int i = 1; i <= totalFloors; i++) {
+            addFloor(i);
+        }
+    }
+
+    void addFloor(int floorNumber) {
+        Floor* newFloor = new Floor(floorNumber);
+        for (int i = 1; i <= roomsPerFloor; i++) {
+            string roomType = (i % 3 == 1) ? "Single" : (i % 3 == 2) ? "Double" : "Suite";
+            newFloor->addRoom((floorNumber - 1) * roomsPerFloor + i, roomType);
+        }
+
+        if (!floorsHead) {
+            floorsHead = newFloor;
+        } else {
+            Floor* temp = floorsHead;
+            while (temp->nextFloor) temp = temp->nextFloor;
+            temp->nextFloor = newFloor;
+        }
+    }
+
+    void displayFloors() {
+        Floor* temp = floorsHead;
+        while (temp) {
+            cout << "\n--- Floor " << temp->floorNumber << " ---\n";
+            temp->displayRooms(temp->rootRoom);
+            temp = temp->nextFloor;
+        }
+    }
+
+    void addBookingRequest(string customerName, string roomType, int nights, bool highPriority) {
+        BookingRequest request(customerName, roomType, nights, highPriority);
+        if (highPriority) {
+            highPriorityQueue.push(request);
+        } else {
+            regularQueue.push(request);
+        }
+        cout << "Booking request added for " << customerName << ".\n";
+    }
+
+    void processBookingRequests() {
+        while (!highPriorityQueue.empty() || !regularQueue.empty()) {
+            if (!highPriorityQueue.empty()) {
+                handleRequest(highPriorityQueue.front());
+                highPriorityQueue.pop();
+            } else if (!regularQueue.empty()) {
+                handleRequest(regularQueue.front());
+                regularQueue.pop();
+            }
+        }
+    }
+
+    void cancelLastBooking() {
+        if (!bookingHistory.empty()) {
+            BookingRecord lastBooking = bookingHistory.top();
+            bookingHistory.pop();
+            setRoomStatus(lastBooking.roomId, "Ready");
+            cout << "Booking for " << lastBooking.customerName << " canceled. Room ID: " 
+                 << lastBooking.roomId << " on floor " << lastBooking.floorNumber 
+                 << " is now Ready.\n";
+        } else {
+            cout << "No bookings to cancel.\n";
+        }
+    }
+
+    void menu() {
+        while (true) {
+            cout << "\n--- Hotel Management System Menu ---\n";
+            cout << "1. Display Floors and Rooms\n";
+            cout << "2. Add Booking Request\n";
+            cout << "3. Process Booking Requests\n";
+            cout << "4. Cancel Most Recent Booking\n";
+            cout << "5. Exit\n";
+            cout << "Enter your choice: ";
+
+            int choice;
+            cin >> choice;
+
+            switch (choice) {
+                case 1:
+                    displayFloors();
+                    break;
+                case 2: {
+                    string name, type;
+                    int nights;
+                    bool highPriority;
+                    cout << "Enter customer name: ";
+                    cin.ignore();
+                    getline(cin, name);
+                    cout << "Enter room type (Single/Double/Suite): ";
+                    cin >> type;
+                    cout << "Enter number of nights: ";
+                    cin >> nights;
+                    cout << "High priority (1 for Yes, 0 for No): ";
+                    cin >> highPriority;
+                    addBookingRequest(name, type, nights, highPriority);
+                    break;
+                }
+                case 3:
+                    processBookingRequests();
+                    break;
+                case 4:
+                    cancelLastBooking();
+                    break;
+                case 5:
+                    cout << "Exiting system. Goodbye!\n";
+                    return;
+                default:
+                    cout << "Invalid choice. Try again.\n";
+            }
+        }
+    }
+
+private:
+    void handleRequest(BookingRequest request) {
+        Floor* floorTemp = floorsHead;
+        while (floorTemp) {
+            Room* roomTemp = findAvailableRoom(floorTemp->rootRoom, request.roomType);
+            if (roomTemp) {
+                roomTemp->status = "Booked";
+                bookingHistory.push(BookingRecord(request.customerName, floorTemp->floorNumber, roomTemp->id));
+                cout << "Booking successful for " << request.customerName
+                     << " in room " << roomTemp->id << " on floor " << floorTemp->floorNumber
+                     << " for " << request.nights << " nights.\n";
+                return;
+            }
+            floorTemp = floorTemp->nextFloor;
+        }
+        cout << "No available " << request.roomType << " rooms for " << request.customerName << ".\n";
+    }
+
+    Room* findAvailableRoom(Room* current, string type) {
+        if (!current) return nullptr;
+        if (current->type == type && current->status == "Ready") return current;
+        Room* leftSearch = findAvailableRoom(current->left, type);
+        if (leftSearch) return leftSearch;
+        return findAvailableRoom(current->right, type);
+    }
+
+    void setRoomStatus(int id, string status) {
+        Floor* floorTemp = floorsHead;
+        while (floorTemp) {
+            Room* roomTemp = findRoomById(floorTemp->rootRoom, id);
+            if (roomTemp) {
+                roomTemp->status = status;
+                return;
+            }
+            floorTemp = floorTemp->nextFloor;
+        }
+    }
+
+    Room* findRoomById(Room* current, int id) {
+        if (!current) return nullptr;
+        if (current->id == id) return current;
+        Room* leftSearch = findRoomById(current->left, id);
+        if (leftSearch) return leftSearch;
+        return findRoomById(current->right, id);
+    }
+};
+
+int main() {
+    HotelManagementSystem hotel(5, 10);
+    hotel.menu();
+    return 0;
+}
