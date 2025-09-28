@@ -1,5 +1,5 @@
-# Hotel Management System
-
+# Hotel Management System:
+```C++
 #include <iostream>
 #include <queue>
 #include <stack>
